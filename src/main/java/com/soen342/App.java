@@ -139,6 +139,8 @@ public class App {
         System.out.println("\n=== Search Results ===");
         System.out.println(result);
 
+        
+
         scanner.close();
     }
 }

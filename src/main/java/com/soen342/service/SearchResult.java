@@ -51,6 +51,20 @@ public class SearchResult {
         searchResultIndirect.sort(Comparator.comparing(Trip::getTotalFCRate).reversed());
     }
 
+    public Trip getTripByID(String tripID) {
+        for (Trip trip : searchResultDirect) {
+            if (trip.getTripID().equals(tripID)) {
+                return trip;
+            }
+        }
+        for (Trip trip : searchResultIndirect) {
+            if (trip.getTripID().equals(tripID)) {
+                return trip;
+            }
+        }
+        return null;
+    }
+
 @Override
 public String toString() {
     StringBuilder sb = new StringBuilder();
