@@ -4,10 +4,12 @@ import com.soen342.domain.Search;
 import com.soen342.service.ConnectionCatalog;
 import com.soen342.service.SearchService;
 import com.soen342.domain.Parameters;
+import com.soen342.domain.Reservation;
 import com.soen342.domain.Search;
 import com.soen342.service.SearchService;
 import com.soen342.service.SearchResult;
 import com.soen342.domain.Trip;
+import com.soen342.domain.Client;
 import java.util.List;
 import java.sql.Time;
 import com.soen342.domain.Connection;
@@ -138,6 +140,29 @@ public class App {
         // --- Display results ---
         System.out.println("\n=== Search Results ===");
         System.out.println(result);
+
+
+        System.out.println("Enter the trip ID to make a booking: ");
+        String tripID = scanner.next();
+        Trip selectedTrip = result.getTripByID(tripID);
+
+        System.out.println("How many passengers? ");
+        int numPassengers = scanner.nextInt();
+        
+        System.out.println("Enter name, age and ID for each passenger: ");
+        for (int i = 0; i < numPassengers; i++) {
+            System.out.println("Passenger " + (i + 1) + ":");
+            System.out.print("Name: ");
+            String name = scanner.next();
+            System.out.print("Age: ");
+            int age = scanner.nextInt();
+            System.out.print("ID: ");
+            String id = scanner.next();
+
+            Client client = new Client(name, age, id);
+            Reservation reservation = new Reservation(client, selectedTrip);
+            System.out.println("Reservation successful! Reservation ID: " + reservation.getReservationID() + ", Ticket ID: " + reservation.getTicket().getTicketID());
+        }
 
         scanner.close();
     }
