@@ -3,6 +3,9 @@ package com.soen342.service;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Time;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +57,7 @@ public class ConnectionCatalog {
         return expanded.toString();
     }
 
+    // Old load from csv directly 
     public void loadFromFile(String filePath) {
         connections.clear();
 
@@ -101,6 +105,77 @@ public class ConnectionCatalog {
         }
     }
 
+    // New load from database  
+    public void loadFromDatabase(String dbPath) {
+        connections.clear();
+
+        String url = "jdbc:sqlite:" + dbPath;
+
+        String sql = """
+            SELECT c.routeId,
+                d.name AS departureCity,
+                a.name AS arrivalCity,
+                c.departureTime,
+                c.arrivalTime,
+                t.type AS trainType,
+                c.daysOfOperation,
+                c.firstClassPrice,
+                c.secondClassPrice
+            FROM Connections c
+            JOIN Cities d ON c.departureCityId = d.id
+            JOIN Cities a ON c.arrivalCityId = a.id
+            JOIN Trains t ON c.trainId = t.id;
+            """;
+
+        try (java.sql.Connection conn = DriverManager.getConnection(url);
+            java.sql.Statement stmt = conn.createStatement();
+            java.sql.ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                String routeID = rs.getString("routeId");
+                String departureCity = rs.getString("departureCity");
+                String arrivalCity = rs.getString("arrivalCity");
+
+                Time departureTime = parseTime(rs.getString("departureTime"));
+                Time arrivalTime = parseTime(rs.getString("arrivalTime"));
+
+                String trainType = rs.getString("trainType");
+                String daysOfOperation = expandDays(rs.getString("daysOfOperation"));
+
+                double firstClassRate = rs.getDouble("firstClassPrice");
+                double secondClassRate = rs.getDouble("secondClassPrice");
+
+                Parameters parameters = new Parameters(
+                        departureCity, arrivalCity, departureTime, arrivalTime,
+                        trainType, daysOfOperation, firstClassRate, secondClassRate
+                );
+
+                Connection connection = new Connection(routeID, parameters);
+                connections.add(connection);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private Time parseTime(String timeStr) {
+        if (timeStr == null || timeStr.isBlank()) {
+            return Time.valueOf("00:00:00");
+        }
+
+        // Remove anything after a space (like "(+1d)")
+        timeStr = timeStr.trim().split(" ")[0];
+
+        // Add missing parts to make it HH:MM:SS
+        if (timeStr.matches("\\d{1,2}")) {
+            timeStr += ":00:00";       // "08" -> "08:00:00"
+        } else if (timeStr.matches("\\d{1,2}:\\d{2}")) {
+            timeStr += ":00";          // "08:30" -> "08:30:00"
+        }
+
+        return Time.valueOf(timeStr);
+    }
 
     // Checks if a direct connection exists. Is used searchTrips 
     public boolean directConnectionExists(Parameters searchParams) {

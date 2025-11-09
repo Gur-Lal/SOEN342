@@ -24,20 +24,23 @@ public class App {
         System.out.println("=== EU Rail Trip Planner ===");
 
         // Fixed path for CSV file so that it works on different machines
-        String csvPath = "src/main/java/com/soen342/resources/eu_rail_network.csv";
-        File csvFile = new File(csvPath);
+        // String csvPath = "src/main/java/com/soen342/resources/eu_rail_network.csv";
+        // File csvFile = new File(csvPath);
 
-        if (!csvFile.exists()) {
-            System.out.println("Error: CSV file not found at " + csvFile.getAbsolutePath());
-            System.exit(1);
-        }
+        // if (!csvFile.exists()) {
+        //     System.out.println("Error: CSV file not found at " + csvFile.getAbsolutePath());
+        //     System.exit(1);
+        // }
 
         // Load CSV file
-        ConnectionCatalog catalog = new ConnectionCatalog();
-        catalog.loadFromFile(csvPath);
+        //ConnectionCatalog catalog = new ConnectionCatalog();
+        //catalog.loadFromFile(csvPath);
         //For debugging 
-       // System.out.println("CSV file loaded successfully.");
+        // System.out.println("CSV file loaded successfully.");
 
+        // Load DB 
+        ConnectionCatalog catalog = new ConnectionCatalog();
+        catalog.loadFromDatabase("src/main/java/com/soen342/resources/mydb.sqlite");
 
        //Parameters initialization
         Time departureTime= null;
