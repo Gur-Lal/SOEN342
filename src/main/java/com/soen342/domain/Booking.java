@@ -74,7 +74,7 @@ public String toString() {
     return "Booking{" +
            "dbId=" + dbId +
            ", bookingID='" + bookingID + '\'' +
-           ", client=" + (client != null ? client.getName() : "N/A") +
+           ", client=" + (client != null ?  client.getFirstName() + " " + client.getLastName()  : "N/A") +
            ", tripID=" + (trip != null ? trip.getTripID() : "N/A") +
            ", reservations=" + reservations.size() +
            '}';

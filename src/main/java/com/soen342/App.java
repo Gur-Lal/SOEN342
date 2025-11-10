@@ -21,6 +21,7 @@ import java.util.Scanner;
 
 
 public class App {
+    
     public static void main(String[] args) {
         DatabaseManager.init();
 
@@ -44,9 +45,30 @@ public class App {
        // System.out.println("CSV file loaded successfully.");
 
        BookingCatalog bookingCatalog = new BookingCatalog();
+        
+         // === MAIN MENU ===
+        System.out.println("=== EU Rail Trip Planner ===");
+        System.out.println("1. Make a new booking");
+        System.out.println("2. View existing reservations");
+        System.out.print("Choose an option (1 or 2): ");
+        String choice = scanner.nextLine().trim();
 
+        if (choice.equals("1")) {
+            makeBooking(scanner, bookingCatalog, catalog);
+        } else if (choice.equals("2")) {
+            viewReservations(scanner, bookingCatalog);
+        } else {
+            System.out.println("Invalid choice. Exiting...");
+        }
 
-       //Parameters initialization
+        
+
+        scanner.close();
+    }
+
+    private static void makeBooking(Scanner scanner, BookingCatalog bookingCatalog,ConnectionCatalog catalog) {
+   //  Take user inputs for Parameters
+        //All inputs are optional that's why we check if they are empty
         Time departureTime= null;
         Time arrivalTime= null;
         String trainType =null;
@@ -54,9 +76,6 @@ public class App {
         double firstClassRate = 0.0;
         double secondClassRate = 0.0;
 
-
-        //  Take user inputs for Parameters
-        //All inputs are optional that's why we check if they are empty
        System.out.print("Enter departure city (press Enter to skip): ");
         String departureCity = scanner.nextLine().trim();
         if (departureCity.isEmpty()) departureCity = null;
@@ -159,14 +178,16 @@ public class App {
         System.out.println("Enter name, age and ID for each passenger: ");
         for (int i = 0; i < numPassengers; i++) {
             System.out.println("Passenger " + (i + 1) + ":");
-            System.out.print("Name: ");
-            String name = scanner.next();
+           System.out.print("First name: "); //  full name
+            String firstName = scanner.nextLine().trim();
+            System.out.print("Last name: ");
+            String lastName = scanner.nextLine().trim();
             System.out.print("Age: ");
             int age = scanner.nextInt();
-           
+           scanner.nextLine(); 
             
 
-            Client client = new Client(name, age);
+            Client client = new Client(firstName, lastName, age); 
             Reservation reservation = new Reservation(client, selectedTrip);
 
             Booking booking = new Booking(client, selectedTrip);
@@ -175,7 +196,17 @@ public class App {
             bookingCatalog.saveBookingToDatabase(booking);
             System.out.println("Reservation successful! Reservation ID: " + reservation.getReservationID() + ", Ticket ID: " + reservation.getTicket().getTicketID());
         }
+}
 
-        scanner.close();
+private static void viewReservations(Scanner scanner, BookingCatalog bookingCatalog) {
+        System.out.print("\nEnter client's first name: ");
+        String firstName = scanner.nextLine().trim();
+        System.out.print("Enter client's last name: ");
+        String lastName = scanner.nextLine().trim();
+
+        bookingCatalog.viewReservationsByClientName(firstName, lastName);
     }
+
+
+
 }

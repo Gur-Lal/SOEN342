@@ -39,24 +39,32 @@ public class BookingCatalog {
     }
 
      public void saveBookingToDatabase(Booking booking) {
-        try (Connection conn = DatabaseManager.getConnection()) {
+        String findClientSQL = "SELECT id FROM Client WHERE firstName = ? AND lastName = ? AND age = ?";
+        String insertClientSQL = "INSERT INTO Client(firstName, lastName, age) VALUES (?, ?, ?)";
+        String insertTripSQL = "INSERT INTO Trip(clientId, totalPrice) VALUES (?, ?)";
+        String insertReservationSQL = "INSERT INTO Reservation(tripId, connectionId) VALUES (?, ?)";
+        String insertTicketSQL = "INSERT INTO Ticket(reservationId, code) VALUES (?, ?)";
 
-            // --- Step 1: Insert or find client ---
+        try (Connection conn = DatabaseManager.getConnection()) {
+            conn.setAutoCommit(false); // Start transaction
+
             int clientId;
-            String findClientSql = "SELECT id FROM Client WHERE identifier = ?";
-            try (PreparedStatement psFind = conn.prepareStatement(findClientSql)) {
-                psFind.setString(1, booking.getClient().getIdentifier());
+            // --- Step 1: Find or insert client ---
+            try (PreparedStatement psFind = conn.prepareStatement(findClientSQL)) {
+                psFind.setString(1, booking.getClient().getFirstName());
+                psFind.setString(2, booking.getClient().getLastName());
+                psFind.setInt(3, booking.getClient().getAge());
                 ResultSet rs = psFind.executeQuery();
+
                 if (rs.next()) {
                     clientId = rs.getInt("id");
                 } else {
-                    String insertClient = "INSERT INTO Client(name, age, identifier) VALUES (?, ?, ?)";
-                    try (PreparedStatement ps = conn.prepareStatement(insertClient, Statement.RETURN_GENERATED_KEYS)) {
-                        ps.setString(1, booking.getClient().getName());
-                        ps.setInt(2, booking.getClient().getAge());
-                        ps.setString(3, booking.getClient().getIdentifier());
-                        ps.executeUpdate();
-                        ResultSet keys = ps.getGeneratedKeys();
+                    try (PreparedStatement psInsert = conn.prepareStatement(insertClientSQL, Statement.RETURN_GENERATED_KEYS)) {
+                        psInsert.setString(1, booking.getClient().getFirstName());
+                        psInsert.setString(2, booking.getClient().getLastName());
+                        psInsert.setInt(3, booking.getClient().getAge());
+                        psInsert.executeUpdate();
+                        ResultSet keys = psInsert.getGeneratedKeys();
                         keys.next();
                         clientId = keys.getInt(1);
                     }
@@ -65,34 +73,113 @@ public class BookingCatalog {
 
             // --- Step 2: Insert trip ---
             int tripId;
-            String insertTrip = "INSERT INTO Trip(clientId, totalPrice) VALUES (?, ?)";
-            try (PreparedStatement ps = conn.prepareStatement(insertTrip, Statement.RETURN_GENERATED_KEYS)) {
-                ps.setInt(1, clientId);
-                ps.setDouble(2, booking.getTrip().getTotalSCRate()); // or totalFCRate
-                ps.executeUpdate();
-                ResultSet keys = ps.getGeneratedKeys();
+            try (PreparedStatement psTrip = conn.prepareStatement(insertTripSQL, Statement.RETURN_GENERATED_KEYS)) {
+                psTrip.setInt(1, clientId);
+                psTrip.setDouble(2, booking.getTrip().getTotalSCRate()); // total 2nd-class price
+                psTrip.executeUpdate();
+                ResultSet keys = psTrip.getGeneratedKeys();
                 keys.next();
                 tripId = keys.getInt(1);
             }
 
-            // --- Step 3: Insert reservations ---
-            for (Reservation r : booking.getReservations()) {
-                for (com.soen342.domain.Connection connection : booking.getTrip().getConnections()) {
-                    String insertReservation = "INSERT INTO Reservation(tripId, connectionId) VALUES (?, ?)";
-                    try (PreparedStatement ps = conn.prepareStatement(insertReservation)) {
-                        ps.setInt(1, tripId);
-                        ps.setInt(2, 0); // placeholder — your Connection table not yet populated
-                        ps.executeUpdate();
+            // --- Step 3: Insert reservations + tickets ---
+            for (Reservation reservation : booking.getReservations()) {
+                for (com.soen342.domain.Connection connItem : booking.getTrip().getConnections()) {
+                    // Retrieve actual connectionId from DB using routeID
+                    int connectionId = 0;
+                    String findConnectionSQL = "SELECT id FROM Connections WHERE routeID = ?";
+                    try (PreparedStatement psFindConn = conn.prepareStatement(findConnectionSQL)) {
+                        psFindConn.setString(1, connItem.getRouteID());
+                        ResultSet rsConn = psFindConn.executeQuery();
+                        if (rsConn.next()) {
+                            connectionId = rsConn.getInt("id");
+                        }
+                    }
+
+                    // Insert reservation
+                    try (PreparedStatement psRes = conn.prepareStatement(insertReservationSQL, Statement.RETURN_GENERATED_KEYS)) {
+                        psRes.setInt(1, tripId);
+                        psRes.setInt(2, connectionId);
+                        psRes.executeUpdate();
+                        ResultSet resKeys = psRes.getGeneratedKeys();
+                        resKeys.next();
+                        int reservationId = resKeys.getInt(1);
+
+                        // Insert ticket linked to this reservation
+                        try (PreparedStatement psTicket = conn.prepareStatement(insertTicketSQL)) {
+                            psTicket.setInt(1, reservationId);
+                            psTicket.setString(2, reservation.getTicket().getTicketID());
+                            psTicket.executeUpdate();
+                        }
                     }
                 }
             }
 
-            System.out.println("Booking saved to database for client: " + booking.getClient().getName());
+            conn.commit(); //  Transaction successful
+            System.out.println("Booking saved for client: "
+                    + booking.getClient().getFirstName() + " " + booking.getClient().getLastName());
 
         } catch (SQLException e) {
-            System.err.println(" Database insert error: " + e.getMessage());
+            System.err.println("Database insert error: " + e.getMessage());
+            e.printStackTrace();
         }
     }
+    public void viewReservationsByClientName(String firstName, String lastName) {
+    String sql = """
+        SELECT 
+            r.id AS reservationId,
+            bt.tripID AS tripCode,
+            c1.name AS departureCity,
+            c2.name AS arrivalCity,
+            tr.type AS trainType,
+            conn.departureTime,
+            conn.arrivalTime,
+            conn.firstClassPrice,
+            conn.secondClassPrice
+        FROM Reservations r
+        JOIN Client cl ON r.clientId = cl.id
+        JOIN BookedTrips bt ON r.tripId = bt.bookedTripId
+        JOIN Connections conn ON r.connectionRouteId = conn.id
+        JOIN Cities c1 ON conn.departureCityId = c1.id
+        JOIN Cities c2 ON conn.arrivalCityId = c2.id
+        JOIN Trains tr ON conn.trainId = tr.id
+        WHERE cl.firstName = ? AND cl.lastName = ?
+        ORDER BY conn.departureTime;
+    """;
+
+    try (Connection conn = DatabaseManager.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+
+        ps.setString(1, firstName);
+        ps.setString(2, lastName);
+        ResultSet rs = ps.executeQuery();
+
+        boolean found = false;
+        System.out.println("\n=== Reservations for " + firstName + " " + lastName + " ===");
+        while (rs.next()) {
+            found = true;
+            System.out.println("Reservation ID: " + rs.getInt("reservationId"));
+            System.out.println("Trip Code: " + rs.getString("tripCode"));
+            System.out.println("From: " + rs.getString("departureCity") + " → " + rs.getString("arrivalCity"));
+            System.out.println("Train: " + rs.getString("trainType"));
+            System.out.println("Departure: " + rs.getString("departureTime"));
+            System.out.println("Arrival: " + rs.getString("arrivalTime"));
+            System.out.println("1st Class: €" + rs.getDouble("firstClassPrice"));
+            System.out.println("2nd Class: €" + rs.getDouble("secondClassPrice"));
+            System.out.println("----------------------------------------");
+        }
+
+        if (!found) {
+            System.out.println("No reservations found for this client.");
+        }
+
+    } catch (SQLException e) {
+        System.err.println("Error retrieving reservations: " + e.getMessage());
+        e.printStackTrace();
+    }
+}
+
+
 
     
 }

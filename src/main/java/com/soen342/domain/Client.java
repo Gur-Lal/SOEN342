@@ -2,31 +2,53 @@ package com.soen342.domain;
 
 public class Client {
     private static int counter = 0;
-    private String name;
+    private int dbId;          // database primary key
+    private String firstName;
+    private String lastName;
     private int age;
-    private String id;
-     private int dbId;
+    private String id;         // internal generated code like CLI0001
 
-    public Client(String name, int age) {
+    //  Constructor for new clients (auto-generate ID)
+    public Client(String firstName, String lastName, int age) {
         counter++;
-        this.name = name;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.age = age;
-        this.id = "CLI" + String.format("%04d", counter); 
+        this.id = "CLI" + String.format("%04d", counter);
     }
 
-    public Client(int dbId, String name, int age, String id) {
+    //  Constructor for clients loaded from DB
+    public Client(int dbId, String firstName, String lastName, int age, String id) {
         this.dbId = dbId;
-        this.name = name;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.age = age;
         this.id = id;
     }
 
-      public String getName() {
-        return name;
+    // Getters & Setters 
+    public int getDbId() {
+        return dbId;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setDbId(int dbId) {
+        this.dbId = dbId;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
     }
 
     public int getAge() {
@@ -45,28 +67,14 @@ public class Client {
         this.id = id;
     }
 
-    public int getDbId() {
-        return dbId;
-    }
-
-    public void setDbId(int dbId) {
-        this.dbId = dbId;
-    }
-
-    //  convenience alias for DB compatibility
-    public String getIdentifier() {
-        return id;
-    }
-
-    // debugging / logging helper
     @Override
     public String toString() {
         return "Client{" +
                 "dbId=" + dbId +
-                ", name='" + name + '\'' +
+                ", firstName='" + firstName + '\'' +
+                ", lastName='" + lastName + '\'' +
                 ", age=" + age +
                 ", id='" + id + '\'' +
                 '}';
     }
-    
 }

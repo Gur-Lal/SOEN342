@@ -62,7 +62,7 @@ public class Reservation {
         return "Reservation{" +
                 "dbId=" + dbId +
                 ", reservationID='" + reservationID + '\'' +
-                ", client=" + (client != null ? client.getName() : "N/A") +
+                ", client=" + (client != null ?  client.getFirstName() + " " + client.getLastName()  : "N/A") +
                 ", tripID=" + (trip != null ? trip.getTripID() : "N/A") +
                 ", connection=" + (connection != null ? connection.getParameters().getDepartureCity() + " → " + connection.getParameters().getArrivalCity() : "N/A") +
                 '}';

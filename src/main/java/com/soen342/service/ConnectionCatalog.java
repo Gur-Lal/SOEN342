@@ -58,18 +58,19 @@ public class ConnectionCatalog {
     public void loadFromFile(String filePath) {
         connections.clear();
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
-            String line = reader.readLine();
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath));
+             java.sql.Connection dbConn = DatabaseManager.getConnection()) {
+
+            String line = reader.readLine(); // skip header
+
             while ((line = reader.readLine()) != null) {
                 String[] parts = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
-
                 if (parts.length < 9) continue;
 
                 for (int i = 0; i < parts.length; i++) {
                     parts[i] = parts[i].replace("\"", "").trim();
                 }
 
-                // Extract values
                 String routeID = parts[0];
                 String departureCity = parts[1];
                 String arrivalCity = parts[2];
@@ -77,8 +78,7 @@ public class ConnectionCatalog {
                 String depTimeStr = parts[3].trim() + ":00";
                 Time departureTime = Time.valueOf(depTimeStr);
 
-                String arrTimeStr = parts[4].trim();
-                arrTimeStr = arrTimeStr.split(" ")[0] + ":00"; // Remove (+1d)
+                String arrTimeStr = parts[4].trim().split(" ")[0] + ":00";
                 Time arrivalTime = Time.valueOf(arrTimeStr);
 
                 String trainType = parts[5];
@@ -86,57 +86,125 @@ public class ConnectionCatalog {
                 double firstClassRate = Double.parseDouble(parts[7]);
                 double secondClassRate = Double.parseDouble(parts[8]);
 
-                // Create parameter object
                 Parameters parameters = new Parameters(
                         departureCity, arrivalCity, departureTime, arrivalTime,
                         trainType, daysOfOperation, firstClassRate, secondClassRate
                 );
 
-                // Create connection object 
                 Connection connection = new Connection(routeID, parameters);
+
+                // insert or find existing in DB, store dbId
+                int dbId = saveToDatabase(dbConn, connection);
+                connection.setId(dbId);
+
                 connections.add(connection);
-
-                //  persist to SQLite
-                saveToDatabase(connection);
             }
+                //POUR DEBUGGING
+           // System.out.println("Loaded " + connections.size() + " connections (DB + memory).");
 
-          //debug
-          //  System.out.println("Connections loaded and saved to SQLite database.");
-        } catch (IOException e) {
+        } catch (IOException | SQLException e) {
             System.err.println("Error loading connections: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    //  persists a single connection into SQLite
-    private void saveToDatabase(Connection connObj) {
-        String sql = """
-            INSERT INTO Connection
-            (routeID, departureCity, arrivalCity, departureTime, arrivalTime,
-             trainType, daysOfOperation, firstClassRate, secondClassRate)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """;
+    // insert into SQLite only if not already there; return DB id
+   private int saveToDatabase(java.sql.Connection dbConn, Connection connObj) throws SQLException {
+    Parameters p = connObj.getParameters();
 
-        try (java.sql.Connection sqlConn = DatabaseManager.getConnection();
-             PreparedStatement ps = sqlConn.prepareStatement(sql)) {
+    //  Find or insert departure & arrival cities ----
+    int depCityId = findOrInsertCity(dbConn, p.getDepartureCity());
+    int arrCityId = findOrInsertCity(dbConn, p.getArrivalCity());
 
-            Parameters p = connObj.getParameters();
-            ps.setString(1, connObj.getRouteID());
-            ps.setString(2, p.getDepartureCity());
-            ps.setString(3, p.getArrivalCity());
-            ps.setString(4, p.getDepartureTime().toString());
-            ps.setString(5, p.getArrivalTime().toString());
-            ps.setString(6, p.getTrainType());
-            ps.setString(7, p.getDaysOfOperation());
-            ps.setDouble(8, p.getFirstClassRate());
-            ps.setDouble(9, p.getSecondClassRate());
-            ps.executeUpdate();
+    // Find or insert train type ----
+    int trainId = findOrInsertTrain(dbConn, p.getTrainType());
 
-        } catch (SQLException e) {
-            System.err.println("Database insert error: " + e.getMessage());
+    //  Check if connection already exists ----
+    String findSql = """
+        SELECT id FROM Connections 
+        WHERE routeId = ? AND departureCityId = ? AND arrivalCityId = ? 
+          AND departureTime = ? AND arrivalTime = ? AND trainId = ?
+    """;
+    try (PreparedStatement psFind = dbConn.prepareStatement(findSql)) {
+        psFind.setString(1, connObj.getRouteID());
+        psFind.setInt(2, depCityId);
+        psFind.setInt(3, arrCityId);
+        psFind.setString(4, p.getDepartureTime().toString());
+        psFind.setString(5, p.getArrivalTime().toString());
+        psFind.setInt(6, trainId);
+        ResultSet rs = psFind.executeQuery();
+        if (rs.next()) {
+            return rs.getInt("id"); // already exists
         }
     }
 
-    // optional helper to fetch all connections from DB
+    //  Insert new connection ----
+    String insertSql = """
+        INSERT INTO Connections
+        (routeId, departureCityId, arrivalCityId, departureTime, arrivalTime,
+         trainId, daysOfOperation, firstClassPrice, secondClassPrice)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+    """;
+
+    try (PreparedStatement ps = dbConn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+        ps.setString(1, connObj.getRouteID());
+        ps.setInt(2, depCityId);
+        ps.setInt(3, arrCityId);
+        ps.setString(4, p.getDepartureTime().toString());
+        ps.setString(5, p.getArrivalTime().toString());
+        ps.setInt(6, trainId);
+        ps.setString(7, p.getDaysOfOperation());
+        ps.setDouble(8, p.getFirstClassRate());
+        ps.setDouble(9, p.getSecondClassRate());
+        ps.executeUpdate();
+
+        ResultSet keys = ps.getGeneratedKeys();
+        keys.next();
+        return keys.getInt(1);
+    }
+}
+
+    private int findOrInsertCity(java.sql.Connection dbConn, String cityName) throws SQLException {
+        String findSql = "SELECT id FROM Cities WHERE name = ?";
+        try (PreparedStatement psFind = dbConn.prepareStatement(findSql)) {
+            psFind.setString(1, cityName);
+            ResultSet rs = psFind.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("id");
+            }
+        }
+
+        String insertSql = "INSERT INTO Cities(name) VALUES (?)";
+        try (PreparedStatement psInsert = dbConn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+            psInsert.setString(1, cityName);
+            psInsert.executeUpdate();
+            ResultSet keys = psInsert.getGeneratedKeys();
+            keys.next();
+            return keys.getInt(1);
+        }
+    }
+    private int findOrInsertTrain(java.sql.Connection dbConn, String trainType) throws SQLException {
+        String findSql = "SELECT id FROM Trains WHERE type = ?";
+        try (PreparedStatement psFind = dbConn.prepareStatement(findSql)) {
+            psFind.setString(1, trainType);
+            ResultSet rs = psFind.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("id");
+            }
+        }
+
+        String insertSql = "INSERT INTO Trains(type) VALUES (?)";
+        try (PreparedStatement psInsert = dbConn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+            psInsert.setString(1, trainType);
+            psInsert.executeUpdate();
+            ResultSet keys = psInsert.getGeneratedKeys();
+            keys.next();
+            return keys.getInt(1);
+        }
+    }
+
+
+    // optional: reload all from DB if needed
     public List<Connection> loadFromDatabase() {
         List<Connection> dbConnections = new ArrayList<>();
         String sql = "SELECT * FROM Connection";
@@ -146,26 +214,27 @@ public class ConnectionCatalog {
              ResultSet rs = st.executeQuery(sql)) {
 
             while (rs.next()) {
-                String routeID = rs.getString("routeID");
-                String depCity = rs.getString("departureCity");
-                String arrCity = rs.getString("arrivalCity");
-                Time depTime = Time.valueOf(rs.getString("departureTime"));
-                Time arrTime = Time.valueOf(rs.getString("arrivalTime"));
-                String type = rs.getString("trainType");
-                String days = rs.getString("daysOfOperation");
-                double fc = rs.getDouble("firstClassRate");
-                double sc = rs.getDouble("secondClassRate");
+                int id = rs.getInt("id");
+                String depCity = rs.getString("departure");
+                String arrCity = rs.getString("arrival");
+                Time depTime = null;
+                Time arrTime = null;
+                double price = rs.getDouble("price");
 
-                Parameters params = new Parameters(depCity, arrCity, depTime, arrTime, type, days, fc, sc);
-                dbConnections.add(new Connection(routeID, params));
+                Parameters params = new Parameters(depCity, arrCity, depTime, arrTime, null, null, 0, price);
+                Connection conn = new Connection(String.valueOf(id), params);
+                conn.setId(id);
+                dbConnections.add(conn);
             }
 
-            System.out.println(" Loaded " + dbConnections.size() + " connections from database.");
+            System.out.println("✅ Loaded " + dbConnections.size() + " connections from DB.");
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return dbConnections;
     }
+
 
     // Checks if a direct connection exists. Is used searchTrips 
     public boolean directConnectionExists(Parameters searchParams) {
