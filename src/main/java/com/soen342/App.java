@@ -1,7 +1,9 @@
 package com.soen342;
 
 import com.soen342.domain.Search;
+import com.soen342.service.BookingCatalog;
 import com.soen342.service.ConnectionCatalog;
+import com.soen342.service.DatabaseManager;
 import com.soen342.service.SearchService;
 import com.soen342.domain.Parameters;
 import com.soen342.domain.Reservation;
@@ -9,6 +11,7 @@ import com.soen342.domain.Search;
 import com.soen342.service.SearchService;
 import com.soen342.service.SearchResult;
 import com.soen342.domain.Trip;
+import com.soen342.domain.Booking;
 import com.soen342.domain.Client;
 import java.util.List;
 import java.sql.Time;
@@ -19,6 +22,8 @@ import java.util.Scanner;
 
 public class App {
     public static void main(String[] args) {
+        DatabaseManager.init();
+
         Scanner scanner = new Scanner(System.in);
 
         System.out.println("=== EU Rail Trip Planner ===");
@@ -37,6 +42,8 @@ public class App {
         catalog.loadFromFile(csvPath);
         //For debugging 
        // System.out.println("CSV file loaded successfully.");
+
+       BookingCatalog bookingCatalog = new BookingCatalog();
 
 
        //Parameters initialization
@@ -156,11 +163,16 @@ public class App {
             String name = scanner.next();
             System.out.print("Age: ");
             int age = scanner.nextInt();
-            System.out.print("ID: ");
-            String id = scanner.next();
+           
+            
 
-            Client client = new Client(name, age, id);
+            Client client = new Client(name, age);
             Reservation reservation = new Reservation(client, selectedTrip);
+
+            Booking booking = new Booking(client, selectedTrip);
+            booking.addReservation(reservation);
+            bookingCatalog.addBooking(booking);
+            bookingCatalog.saveBookingToDatabase(booking);
             System.out.println("Reservation successful! Reservation ID: " + reservation.getReservationID() + ", Ticket ID: " + reservation.getTicket().getTicketID());
         }
 

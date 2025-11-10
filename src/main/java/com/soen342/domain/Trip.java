@@ -9,6 +9,7 @@ public class Trip {
     private Time totalTime;
     private double totalFCRate;
     private double totalSCRate;
+    private double totalPrice;
     private List<Connection> connections;
 
     public Trip(Time totalTime, double totalFCRate, double totalSCRate, List<Connection> connections) {
@@ -59,6 +60,13 @@ public class Trip {
     public int getNumberOfConnections() {
         return connections.size();
     }
+      public double getTotalPrice() {
+        return totalPrice;
+    }
+
+    public void setTotalPrice(double totalPrice) {
+        this.totalPrice = totalPrice;
+    }
 
     @Override 
     public String toString() {
@@ -73,6 +81,7 @@ public class Trip {
         sb.append("Total Time: ").append(totalTime).append("\n");
         sb.append("Total First Class Rate: EUR ").append(totalFCRate).append("0\n");
         sb.append("Total Second Class Rate: EUR ").append(totalSCRate).append("0\n");
+        sb.append("Total Selected Price: EUR ").append(totalPrice).append("0\n");
         sb.append("Connections:\n");
 
         for (Connection conn : connections) {

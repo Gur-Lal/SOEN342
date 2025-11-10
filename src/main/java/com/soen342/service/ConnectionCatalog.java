@@ -1,9 +1,9 @@
 package com.soen342.service;
+import java.sql.*;    
 
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.sql.Time;
 import java.util.ArrayList;
 import java.util.List;
 import com.soen342.domain.Trip;
@@ -54,6 +54,7 @@ public class ConnectionCatalog {
         return expanded.toString();
     }
 
+     // now also saves to SQLite after loading from file
     public void loadFromFile(String filePath) {
         connections.clear();
 
@@ -94,13 +95,77 @@ public class ConnectionCatalog {
                 // Create connection object 
                 Connection connection = new Connection(routeID, parameters);
                 connections.add(connection);
+
+                //  persist to SQLite
+                saveToDatabase(connection);
             }
 
+          //debug
+          //  System.out.println("Connections loaded and saved to SQLite database.");
         } catch (IOException e) {
             System.err.println("Error loading connections: " + e.getMessage());
         }
     }
 
+    //  persists a single connection into SQLite
+    private void saveToDatabase(Connection connObj) {
+        String sql = """
+            INSERT INTO Connection
+            (routeID, departureCity, arrivalCity, departureTime, arrivalTime,
+             trainType, daysOfOperation, firstClassRate, secondClassRate)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """;
+
+        try (java.sql.Connection sqlConn = DatabaseManager.getConnection();
+             PreparedStatement ps = sqlConn.prepareStatement(sql)) {
+
+            Parameters p = connObj.getParameters();
+            ps.setString(1, connObj.getRouteID());
+            ps.setString(2, p.getDepartureCity());
+            ps.setString(3, p.getArrivalCity());
+            ps.setString(4, p.getDepartureTime().toString());
+            ps.setString(5, p.getArrivalTime().toString());
+            ps.setString(6, p.getTrainType());
+            ps.setString(7, p.getDaysOfOperation());
+            ps.setDouble(8, p.getFirstClassRate());
+            ps.setDouble(9, p.getSecondClassRate());
+            ps.executeUpdate();
+
+        } catch (SQLException e) {
+            System.err.println("Database insert error: " + e.getMessage());
+        }
+    }
+
+    // optional helper to fetch all connections from DB
+    public List<Connection> loadFromDatabase() {
+        List<Connection> dbConnections = new ArrayList<>();
+        String sql = "SELECT * FROM Connection";
+
+        try (java.sql.Connection dbConn = DatabaseManager.getConnection();
+             Statement st = dbConn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+
+            while (rs.next()) {
+                String routeID = rs.getString("routeID");
+                String depCity = rs.getString("departureCity");
+                String arrCity = rs.getString("arrivalCity");
+                Time depTime = Time.valueOf(rs.getString("departureTime"));
+                Time arrTime = Time.valueOf(rs.getString("arrivalTime"));
+                String type = rs.getString("trainType");
+                String days = rs.getString("daysOfOperation");
+                double fc = rs.getDouble("firstClassRate");
+                double sc = rs.getDouble("secondClassRate");
+
+                Parameters params = new Parameters(depCity, arrCity, depTime, arrTime, type, days, fc, sc);
+                dbConnections.add(new Connection(routeID, params));
+            }
+
+            System.out.println(" Loaded " + dbConnections.size() + " connections from database.");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return dbConnections;
+    }
 
     // Checks if a direct connection exists. Is used searchTrips 
     public boolean directConnectionExists(Parameters searchParams) {
