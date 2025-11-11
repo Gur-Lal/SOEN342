@@ -340,8 +340,9 @@ public class ConnectionCatalog {
                 // Avoid loops or redundant paths
                 if (dep2.equalsIgnoreCase(arr1) &&
                     arr2.equalsIgnoreCase(searchParams.getArrivalCity()) &&
-                    !arr2.equalsIgnoreCase(dep1) &&   // don’t go back to start
-                    !dep2.equalsIgnoreCase(dep1)) {   // avoid same city twice
+                    !arr2.equalsIgnoreCase(dep1) &&
+                    !dep2.equalsIgnoreCase(dep1) &&  // avoid same city twice
+                    isLayoverValid(conn1.getParameters().getArrivalTime(), conn2.getParameters().getDepartureTime())) {  
 
                     // Build valid trip
                     List<Connection> connList = new ArrayList<>();
@@ -379,11 +380,12 @@ public class ConnectionCatalog {
                         String dep3 = conn3.getParameters().getDepartureCity();
                         String arr3 = conn3.getParameters().getArrivalCity();
 
-                        if (dep3.equalsIgnoreCase(arr2) &&
+                       if (dep3.equalsIgnoreCase(arr2) &&
                             arr3.equalsIgnoreCase(searchParams.getArrivalCity()) &&
-                            !arr3.equalsIgnoreCase(dep1) &&  // avoid loop back to start
-                            !arr3.equalsIgnoreCase(arr1) &&  // avoid revisiting arr1
-                            !dep3.equalsIgnoreCase(dep1)) {  // avoid same city twice
+                            !arr3.equalsIgnoreCase(dep1) &&
+                            !arr3.equalsIgnoreCase(arr1) &&
+                            !dep3.equalsIgnoreCase(dep1) &&
+                            isLayoverValid(conn2.getParameters().getArrivalTime(), conn3.getParameters().getDepartureTime())) {  // avoid same city twice
 
                             List<Connection> connList = new ArrayList<>();
                             connList.add(conn1);
@@ -406,6 +408,26 @@ public class ConnectionCatalog {
     }
 
     return result;
+}
+
+//  checks if a layover between two trains is valid
+private boolean isLayoverValid(Time arrivalTime, Time nextDepartureTime) {
+    java.time.LocalTime arr = arrivalTime.toLocalTime();
+    java.time.LocalTime dep = nextDepartureTime.toLocalTime();
+
+    long minutes = java.time.Duration.between(arr, dep).toMinutes();
+    if (minutes < 0) {
+        minutes += 24 * 60; // handle overnight wrap-around
+    }
+
+    boolean isDaytime = !arr.isBefore(java.time.LocalTime.of(6, 0)) &&
+                        arr.isBefore(java.time.LocalTime.of(22, 0));
+
+    if (isDaytime) {
+        return minutes >= 10 && minutes <= 120;  
+    } else {
+        return minutes >= 5 && minutes <= 30;   
+    }
 }
 
 
