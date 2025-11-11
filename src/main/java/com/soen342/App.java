@@ -174,11 +174,12 @@ public class App {
 
         System.out.println("How many passengers? ");
         int numPassengers = scanner.nextInt();
+        scanner.nextLine();
         
         System.out.println("Enter name, age and ID for each passenger: ");
         for (int i = 0; i < numPassengers; i++) {
             System.out.println("Passenger " + (i + 1) + ":");
-           System.out.print("First name: "); //  full name
+           System.out.print("First name: ");
             String firstName = scanner.nextLine().trim();
             System.out.print("Last name: ");
             String lastName = scanner.nextLine().trim();

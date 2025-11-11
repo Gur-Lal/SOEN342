@@ -97,7 +97,7 @@ public final class DatabaseManager {
 
             //POUR DEBUGGING
 
-           // System.out.println("Database schema created — matches ER diagram exactly.");
+           // System.out.println("Database schema created");
 
         } catch (SQLException e) {
             System.err.println("Database initialization error: " + e.getMessage());
