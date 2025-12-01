@@ -1,5 +1,7 @@
 # Build
 target/
+*.class
+
 
 # IntelliJ / VSCode
 .idea/
