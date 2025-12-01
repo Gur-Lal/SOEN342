@@ -13,6 +13,7 @@ import com.soen342.domain.Booking;
 import com.soen342.service.SearchResult;
 import com.soen342.domain.Trip;
 import com.soen342.domain.Client;
+import java.util.List;
 import java.sql.Time;
 import java.io.File;
 import java.util.List;
@@ -189,6 +190,7 @@ public class App {
         System.out.println("\n=== Search Results ===");
         System.out.println(result);
 
+
         System.out.println("Enter the trip ID to make a booking: ");
         String tripID = scanner.next();
         Trip selectedTrip = result.getTripByID(tripID);
@@ -238,7 +240,6 @@ public class App {
         } else {
             System.out.println("Failed to save booking to database.");
         }
-
         scanner.close();
         dbManager.closeConnection();
     }
