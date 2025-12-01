@@ -16,4 +16,27 @@ public class Ticket {
     public String getTicketID() {
         return ticketID;
     }
+    
+    public Reservation getReservation() {
+        return reservation;
+    }
+    
+    public Client getClient() {
+        return client;
+    }
+    
+    /**
+     * Initialize the static counter from database
+     * Call this at application startup
+     */
+    public static void initializeCounter(int maxCounter) {
+        counter = maxCounter;
+    }
+    
+    /**
+     * Get current counter value (for testing/debugging)
+     */
+    public static int getCounter() {
+        return counter;
+    }
 }

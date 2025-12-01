@@ -7,7 +7,6 @@ import java.sql.Time;
 import java.util.ArrayList;
 import java.util.List;
 import com.soen342.domain.Trip;
-import com.soen342.domain.Search;
 import com.soen342.domain.Parameters;
 import com.soen342.domain.Connection;
 
@@ -101,6 +100,25 @@ public class ConnectionCatalog {
         }
     }
 
+     private boolean isLayoverValid(Time arrivalTime, Time nextDepartureTime) {
+        java.time.LocalTime arr = arrivalTime.toLocalTime();
+        java.time.LocalTime dep = nextDepartureTime.toLocalTime();
+        long minutes = java.time.Duration.between(arr, dep).toMinutes();
+        
+        if (minutes < 0) {
+            minutes += 24 * 60; // handle overnight wrap-around
+        }
+        
+        boolean isDaytime = !arr.isBefore(java.time.LocalTime.of(6, 0)) &&
+                            arr.isBefore(java.time.LocalTime.of(22, 0));
+        
+        if (isDaytime) {
+            return minutes >= 10 && minutes <= 120;  
+        } else {
+            return minutes >= 5 && minutes <= 30;   
+        }
+    }
+
 
     // Checks if a direct connection exists. Is used searchTrips 
     public boolean directConnectionExists(Parameters searchParams) {
@@ -190,89 +208,114 @@ public class ConnectionCatalog {
         
     }
 
-    public List<Trip> searchIndirect(Parameters searchParams) {
-    List<Trip> result = new ArrayList<>();
+     public List<Trip> searchIndirect(Parameters searchParams) {
+        List<Trip> result = new ArrayList<>();
 
-    // --- Two-hop connections ---
-    for (Connection conn1 : connections) {
-        String dep1 = conn1.getParameters().getDepartureCity();
-        String arr1 = conn1.getParameters().getArrivalCity();
+        // --- Two-hop connections ---
+        for (Connection conn1 : connections) {
+            String dep1 = conn1.getParameters().getDepartureCity();
+            String arr1 = conn1.getParameters().getArrivalCity();
 
-        if (dep1.equalsIgnoreCase(searchParams.getDepartureCity())) {
-            for (Connection conn2 : connections) {
-                String dep2 = conn2.getParameters().getDepartureCity();
-                String arr2 = conn2.getParameters().getArrivalCity();
+            if (dep1.equalsIgnoreCase(searchParams.getDepartureCity())) {
+                for (Connection conn2 : connections) {
+                    String dep2 = conn2.getParameters().getDepartureCity();
+                    String arr2 = conn2.getParameters().getArrivalCity();
 
-                // Avoid loops or redundant paths
-                if (dep2.equalsIgnoreCase(arr1) &&
-                    arr2.equalsIgnoreCase(searchParams.getArrivalCity()) &&
-                    !arr2.equalsIgnoreCase(dep1) &&   // don’t go back to start
-                    !dep2.equalsIgnoreCase(dep1)) {   // avoid same city twice
+                    // Check if cities match for valid connection
+                    if (dep2.equalsIgnoreCase(arr1) &&
+                        arr2.equalsIgnoreCase(searchParams.getArrivalCity()) &&
+                        !arr2.equalsIgnoreCase(dep1) &&   // don't go back to start
+                        !dep2.equalsIgnoreCase(dep1)) {   // avoid same city twice
 
-                    // Build valid trip
-                    List<Connection> connList = new ArrayList<>();
-                    connList.add(conn1);
-                    connList.add(conn2);
+                        // Check if layover time is valid
+                        Time arrivalTime1 = conn1.getParameters().getArrivalTime();
+                        Time departureTime2 = conn2.getParameters().getDepartureTime();
+                        
+                        if (!isLayoverValid(arrivalTime1, departureTime2)) {
+                            continue; // Skip this connection pair if layover is invalid
+                        }
 
-                    Time totalTime = calculateTotalTime(connList);
-                    double totalFCRate = calculateTotalFCRate(connList);
-                    double totalSCRate = calculateTotalSCRate(connList);
-                    Trip trip = new Trip(totalTime, totalFCRate, totalSCRate, connList);
+                        // Build valid trip
+                        List<Connection> connList = new ArrayList<>();
+                        connList.add(conn1);
+                        connList.add(conn2);
 
-                    // Avoid adding if already present (basic duplicate check)
-                    if (!result.contains(trip)) {
-                        result.add(trip);
+                        Time totalTime = calculateTotalTime(connList);
+                        double totalFCRate = calculateTotalFCRate(connList);
+                        double totalSCRate = calculateTotalSCRate(connList);
+                        Trip trip = new Trip(totalTime, totalFCRate, totalSCRate, connList);
+
+                        // Avoid adding if already present (basic duplicate check)
+                        if (!result.contains(trip)) {
+                            result.add(trip);
+                        }
                     }
                 }
             }
         }
-    }
 
-    // --- Three-hop connections ---
-    for (Connection conn1 : connections) {
-        String dep1 = conn1.getParameters().getDepartureCity();
-        String arr1 = conn1.getParameters().getArrivalCity();
+        // --- Three-hop connections ---
+        for (Connection conn1 : connections) {
+            String dep1 = conn1.getParameters().getDepartureCity();
+            String arr1 = conn1.getParameters().getArrivalCity();
 
-        if (dep1.equalsIgnoreCase(searchParams.getDepartureCity())) {
-            for (Connection conn2 : connections) {
-                String dep2 = conn2.getParameters().getDepartureCity();
-                String arr2 = conn2.getParameters().getArrivalCity();
+            if (dep1.equalsIgnoreCase(searchParams.getDepartureCity())) {
+                for (Connection conn2 : connections) {
+                    String dep2 = conn2.getParameters().getDepartureCity();
+                    String arr2 = conn2.getParameters().getArrivalCity();
 
-                if (dep2.equalsIgnoreCase(arr1) &&
-                    !arr2.equalsIgnoreCase(dep1) &&   // no return to start
-                    !dep2.equalsIgnoreCase(dep1)) {   // avoid same city twice
-                    for (Connection conn3 : connections) {
-                        String dep3 = conn3.getParameters().getDepartureCity();
-                        String arr3 = conn3.getParameters().getArrivalCity();
+                    if (dep2.equalsIgnoreCase(arr1) &&
+                        !arr2.equalsIgnoreCase(dep1) &&   // no return to start
+                        !dep2.equalsIgnoreCase(dep1)) {   // avoid same city twice
+                        
+                        // Check first layover
+                        Time arrivalTime1 = conn1.getParameters().getArrivalTime();
+                        Time departureTime2 = conn2.getParameters().getDepartureTime();
+                        
+                        if (!isLayoverValid(arrivalTime1, departureTime2)) {
+                            continue; // Skip if first layover is invalid
+                        }
+                        
+                        for (Connection conn3 : connections) {
+                            String dep3 = conn3.getParameters().getDepartureCity();
+                            String arr3 = conn3.getParameters().getArrivalCity();
 
-                        if (dep3.equalsIgnoreCase(arr2) &&
-                            arr3.equalsIgnoreCase(searchParams.getArrivalCity()) &&
-                            !arr3.equalsIgnoreCase(dep1) &&  // avoid loop back to start
-                            !arr3.equalsIgnoreCase(arr1) &&  // avoid revisiting arr1
-                            !dep3.equalsIgnoreCase(dep1)) {  // avoid same city twice
+                            if (dep3.equalsIgnoreCase(arr2) &&
+                                arr3.equalsIgnoreCase(searchParams.getArrivalCity()) &&
+                                !arr3.equalsIgnoreCase(dep1) &&  // avoid loop back to start
+                                !arr3.equalsIgnoreCase(arr1) &&  // avoid revisiting arr1
+                                !dep3.equalsIgnoreCase(dep1)) {  // avoid same city twice
 
-                            List<Connection> connList = new ArrayList<>();
-                            connList.add(conn1);
-                            connList.add(conn2);
-                            connList.add(conn3);
+                                // Check second layover
+                                Time arrivalTime2 = conn2.getParameters().getArrivalTime();
+                                Time departureTime3 = conn3.getParameters().getDepartureTime();
+                                
+                                if (!isLayoverValid(arrivalTime2, departureTime3)) {
+                                    continue; // Skip if second layover is invalid
+                                }
 
-                            Time totalTime = calculateTotalTime(connList);
-                            double totalFCRate = calculateTotalFCRate(connList);
-                            double totalSCRate = calculateTotalSCRate(connList);
-                            Trip trip = new Trip(totalTime, totalFCRate, totalSCRate, connList);
+                                List<Connection> connList = new ArrayList<>();
+                                connList.add(conn1);
+                                connList.add(conn2);
+                                connList.add(conn3);
 
-                            if (!result.contains(trip)) {
-                                result.add(trip);
+                                Time totalTime = calculateTotalTime(connList);
+                                double totalFCRate = calculateTotalFCRate(connList);
+                                double totalSCRate = calculateTotalSCRate(connList);
+                                Trip trip = new Trip(totalTime, totalFCRate, totalSCRate, connList);
+
+                                if (!result.contains(trip)) {
+                                    result.add(trip);
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
 
-    return result;
-}
+        return result;
+    }
 
 
     @Override

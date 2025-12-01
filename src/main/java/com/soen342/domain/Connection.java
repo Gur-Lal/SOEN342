@@ -11,6 +11,10 @@ public class Connection {
         this.parameters = parameters;
     }
 
+    public String getRouteID() {
+        return routeID;
+    }
+
     public Parameters getParameters() {
         return parameters;
     }
@@ -35,14 +39,14 @@ public class Connection {
     }
 
     public String toString() {
-    return "Connection Details:\n" +
-           "From: " + parameters.getDepartureCity() +
-           ", To: " + parameters.getArrivalCity() +
-           ", Departure: " + parameters.getDepartureTime() +
-           ", Arrival: " + parameters.getArrivalTime() +
-           ", Train: " + parameters.getTrainType() +
-           ", Days: " + parameters.getDaysOfOperation() +
-           ", 1st Class: EUR " + parameters.getFirstClassRate() + "0" +
-           ", 2nd Class: EUR " + parameters.getSecondClassRate() + "0";
+        return "Connection Details:\n" +
+               "From: " + parameters.getDepartureCity() +
+               ", To: " + parameters.getArrivalCity() +
+               ", Departure: " + parameters.getDepartureTime() +
+               ", Arrival: " + parameters.getArrivalTime() +
+               ", Train: " + parameters.getTrainType() +
+               ", Days: " + parameters.getDaysOfOperation() +
+               ", 1st Class: EUR " + parameters.getFirstClassRate() + "0" +
+               ", 2nd Class: EUR " + parameters.getSecondClassRate() + "0";
     }
 }

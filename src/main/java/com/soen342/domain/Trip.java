@@ -82,6 +82,7 @@ public class Trip {
 
         return sb.toString();
     }
+    
     //Needed to compare two Trip objects to avoid duplicates in the list of trips
     @Override
     public boolean equals(Object o) {
@@ -90,6 +91,19 @@ public class Trip {
         Trip t = (Trip) o;
         return this.getConnections().equals(t.getConnections());
     }
-
-
+    
+    /**
+     * Initialize the static counter from database
+     * Call this at application startup
+     */
+    public static void initializeCounter(int maxCounter) {
+        counter = maxCounter;
+    }
+    
+    /**
+     * Get current counter value (for testing/debugging)
+     */
+    public static int getCounter() {
+        return counter;
+    }
 }
