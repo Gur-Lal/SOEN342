@@ -1,0 +1,16 @@
+# Build
+target/
+*.class
+
+
+# IntelliJ / VSCode
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

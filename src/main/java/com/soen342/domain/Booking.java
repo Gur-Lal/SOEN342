@@ -22,6 +22,27 @@ public class Booking {
     public String getBookingID() {
         return bookingID;
     }
-
-
+    
+    public Trip getTrip() {
+        return trip;
+    }
+    
+    public List<Reservation> getReservations() {
+        return reservations;
+    }
+    
+    /**
+     * Initialize the static counter from database
+     * Call this at application startup
+     */
+    public static void initializeCounter(int maxCounter) {
+        counter = maxCounter;
+    }
+    
+    /**
+     * Get current counter value (for testing/debugging)
+     */
+    public static int getCounter() {
+        return counter;
+    }
 }
